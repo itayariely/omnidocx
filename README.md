@@ -34,7 +34,7 @@ require 'omnidocx'
 $ Omnidocx::Docx.merge_documents(documents_to_merge=[], output_document_path, page_break)
 
 # for e.g. if you had to merge two documents, just pass their entire paths in an array, if you need a page break in between documents then pass the page_break flag as true 
-$ Omnidocx::Docx.merge_documents(['tmp/doc1.docx', 'tmp/doc2.docx'], 'tmp/output_doc.docx', true)
+$ Omnidocx::Docx.merge_documents(['tmp/header_file.docx', 'tmp/body_file.docx'], 'tmp/output_doc.docx', false)
 ```
 
 ## To Write Images to a Document
