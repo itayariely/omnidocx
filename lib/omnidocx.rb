@@ -11,8 +11,8 @@ module Omnidocx
     DOCUMENT_FILE_PATH = 'word/document.xml'
     RELATIONSHIP_FILE_PATH = 'word/_rels/document.xml.rels'
     CONTENT_TYPES_FILE = '[Content_Types].xml'
-    HEADER_RELS_FILE_PATH = 'word/_rels/header1.xml.rels'
-    FOOTER_RELS_FILE_PATH = 'word/_rels/footer1.xml.rels'
+    HEADER_RELS_FILE_REGEX = /word\/_rels\/header\d+\.xml\.rels/
+    FOOTER_RELS_FILE_REGEX = /word\/_rels\/footer\d+\.xml\.rels/
     STYLES_FILE_PATH = "word/styles.xml"
     HEADER_FILE_PATH = "word/header1.xml"
     FOOTER_FILE_PATH = "word/footer1.xml"
@@ -25,11 +25,11 @@ module Omnidocx
     VERTICAL_DPI = 117
 
     NAMESPACES = {
-      "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
-      "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
-      "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
-      "pic": "http://schemas.openxmlformats.org/drawingml/2006/picture",
-      "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+      w: "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+      wp: "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+      a: "http://schemas.openxmlformats.org/drawingml/2006/main",
+      pic: "http://schemas.openxmlformats.org/drawingml/2006/picture",
+      r: "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
     }
 
     IMAGE_ELEMENT = '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:rsidR="00F127EA" w:rsidRDefault="00F127EA" w:rsidP="00BF4C96"><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:noProof/><w:lang w:eastAsia="en-IN"/></w:rPr><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="" cy=""/><wp:effectExtent l="0" t="0" r="2540" b="1905"/><wp:docPr id="" name=""/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="" name=""/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed=""><a:extLst><a:ext uri="{28A0092B-C50C-407E-A947-70E740481C1C}"><a14:useLocalDpi xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" val="0"/></a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="" cy=""/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>'
@@ -138,6 +138,7 @@ module Omnidocx
               pic_cNvPr["id"] = "#{cnt}"
 
               blip = dr_node.xpath(".//a:blip", NAMESPACES).last
+              next unless blip
               blip.attributes["embed"].value = "rid#{cnt}"
             end
 
@@ -242,7 +243,7 @@ module Omnidocx
           zip_file = Zip::File.new(doc_path)
 
           zip_file.entries.each do |e|
-            if [HEADER_RELS_FILE_PATH, FOOTER_RELS_FILE_PATH].include?(e.name)
+            if [e.name.match(HEADER_RELS_FILE_REGEX), e.name.match(FOOTER_RELS_FILE_REGEX)].any?
               hf_xml = Nokogiri::XML(e.get_input_stream.read)
               hf_xml.css("Relationship").each do |rel_node|
                 #media file names in header & footer need not be changed as they will be picked from the first document only and not the subsequent documents, so no chance of duplication
@@ -299,6 +300,8 @@ module Omnidocx
           #updating the stlye ids in the table elements present in the document content XML
           doc_content = doc_cnt == 0 ? @main_body : Nokogiri::XML(zip_file.read(DOCUMENT_FILE_PATH))
           doc_content.xpath("//w:tbl").each do |tbl_node|
+            # byebug
+            next if tbl_node.xpath('.//w:tblStyle').nil?
             style_last = tbl_node.xpath('.//w:tblStyle').last
             unless style_last.nil?
               val_attr = style_last.attributes['val']
@@ -327,7 +330,10 @@ module Omnidocx
                   id_attr.value = new_id
                 else
                   # adding the extra relationship nodes for the media files to the relationship XML
-                  new_rel_node = "<Relationship Id=#{new_id} Type=#{node["Type"]} Target=#{target_val} />"
+                  new_rel_node = Nokogiri::XML::Node.new("Relationship", @rel_doc)
+                  new_rel_node["Id"] = new_id
+                  new_rel_node["Type"] = node["Type"]
+                  new_rel_node["Target"] = target_val
                   @rel_doc.at('Relationships').add_child(new_rel_node)
                 end
               end
