@@ -8,7 +8,7 @@ This gem works for docx files generated from microsoft word as well as google do
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'omnidocx'
+gem 'omnidocx' , git: "https://github.com/itayariely/omnidocx.git"
 ```
 
 And then execute:
@@ -17,7 +17,7 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install omnidocx
+    $ gem install omnidocx -s https://github.com/itayariely/omnidocx.git
 
 ## To Merge Documents
 
